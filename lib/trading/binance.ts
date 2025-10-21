@@ -1,7 +1,9 @@
 import ccxt from "ccxt";
-import { riskConfig } from "../config/risk";
+import { getRiskConfig } from "../risk/config";
 
 // 根据配置决定使用测试网还是正式环境
+const riskConfig = getRiskConfig();
+
 export const binance = new ccxt.binance({
   apiKey: process.env.BINANCE_API_KEY,
   secret: process.env.BINANCE_API_SECRET,

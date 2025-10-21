@@ -1,7 +1,7 @@
 // Binance 行情数据提供者实现
 import { MarketDataProvider, OHLCVData, QuoteData, IndicatorData } from '../exchange/types';
 import { binance } from '../trading/binance';
-import { riskConfig } from '../config/risk';
+import { getRiskConfig } from '../risk/config';
 
 export class BinanceMarketDataProvider implements MarketDataProvider {
   async getOHLCV(symbol: string, timeframe: string, limit = 100): Promise<OHLCVData[]> {
@@ -9,6 +9,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
 
     // 根据模式选择网络
     const { binance: BinanceExchange } = await import('ccxt');
+    const riskConfig = getRiskConfig();
     const exchange = riskConfig.mode === 'paper' ?
       new BinanceExchange({
         apiKey: process.env.BINANCE_API_KEY,
@@ -36,6 +37,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
 
     // 根据模式选择网络
     const { binance: BinanceExchange } = await import('ccxt');
+    const riskConfig = getRiskConfig();
     const exchange = riskConfig.mode === 'paper' ?
       new BinanceExchange({
         apiKey: process.env.BINANCE_API_KEY,

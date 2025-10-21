@@ -1,4 +1,4 @@
-import { getRiskConfig } from '../../lib/config/risk';
+import { getRiskConfig } from '../../lib/risk/config';
 
 // Mock environment variables
 const originalEnv = process.env;

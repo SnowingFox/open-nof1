@@ -4,12 +4,33 @@ import { getSystemPrompt } from './prompt';
 import { tradingTools } from './tools';
 import { RiskGuard } from '@/lib/risk/risk-guard';
 import { AuditLogger, TradingSession } from '@/lib/storage/audit-logger';
+import { TradingBroker } from '@/lib/exchange/types';
+import { PositionManager } from '@/lib/position/position-manager';
 
 export class TradingAgent {
+  private positionManager: PositionManager;
+
   constructor(
+    private broker: TradingBroker,
     private riskGuard: RiskGuard,
     private logger: AuditLogger
-  ) {}
+  ) {
+    this.positionManager = new PositionManager(broker);
+  }
+
+  /**
+   * Get the position manager instance
+   */
+  getPositionManager(): PositionManager {
+    return this.positionManager;
+  }
+
+  /**
+   * Get the broker instance
+   */
+  getBroker(): TradingBroker {
+    return this.broker;
+  }
 
   /**
    * 执行交易任务（多个币种）
@@ -37,6 +58,10 @@ export class TradingAgent {
     console.log(`\n📊 Processing ${symbol}...`);
 
     try {
+      // Sync positions before trading
+      await this.positionManager.syncPositions([symbol]);
+      console.log(this.positionManager.getPositionSummary());
+
       // 调用 AI，让它自主执行整个流程
       const result = await generateText({
         model: deepseekR1,

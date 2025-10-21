@@ -1,12 +1,16 @@
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
+// Use dummy key for mock mode to prevent initialization errors
+const deepseekApiKey = process.env.DEEPSEEK_API_KEY || 'mock-key';
+const openrouterApiKey = process.env.OPENROUTER_API_KEY || 'mock-key';
+
 const deepseekModel = createDeepSeek({
-  apiKey: process.env.DEEPSEEK_API_KEY,
+  apiKey: deepseekApiKey,
 });
 
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: openrouterApiKey,
 });
 
 export const deepseekv31 = openrouter("deepseek/deepseek-v3.2-exp");
