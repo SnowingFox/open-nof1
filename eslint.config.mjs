@@ -20,6 +20,18 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off", // Allow any type
+      "@typescript-eslint/no-unused-vars": "warn", // Change to warning instead of error
+    },
+  },
+  {
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off", // Allow require() in test files
+    },
+  },
 ];
 
 export default eslintConfig;

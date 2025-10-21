@@ -1,4 +1,4 @@
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface SellOptions {
   symbol: string; // 交易对，如 'BTC/USDT' 或 'BTC'
@@ -102,68 +102,134 @@ async function getCurrentPosition(symbol: string): Promise<number> {
 }
 
 /**
- * Place a stop loss order
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Place a stop loss order with retry
  */
 async function placeStopLoss(
   symbol: string,
   amount: number,
   stopPrice: number,
-  side: "buy" | "sell"
+  side: "buy" | "sell",
+  maxRetries: number = 3
 ): Promise<string | number | undefined> {
-  try {
-    // Stop loss is opposite direction to entry
-    const stopSide = side === "sell" ? "buy" : "sell";
+  // Stop loss is opposite direction to entry
+  const stopSide = side === "sell" ? "buy" : "sell";
 
-    const order = await binance.createOrder(
-      symbol,
-      "STOP_MARKET",
-      stopSide,
-      amount,
-      undefined,
-      {
-        stopPrice: stopPrice,
-        reduceOnly: true,
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const order = await binance.createOrder(
+        symbol,
+        "STOP_MARKET",
+        stopSide,
+        amount,
+        undefined,
+        {
+          stopPrice: stopPrice,
+          reduceOnly: true,
+        }
+      );
+
+      console.log(`✓ Stop loss order placed at $${stopPrice}`);
+      return order.id;
+    } catch (error: any) {
+      console.error(`⚠️ Stop loss attempt ${attempt}/${maxRetries} failed:`, error.message);
+
+      if (attempt < maxRetries) {
+        const delayMs = attempt * 1000; // Exponential backoff: 1s, 2s, 3s
+        console.log(`⏳ Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+      } else {
+        console.error(`❌ Stop loss placement failed after ${maxRetries} attempts`);
+        return undefined;
       }
-    );
-
-    console.log(`✓ Stop loss order placed at $${stopPrice}`);
-    return order.id;
-  } catch (error: any) {
-    console.error("Error placing stop loss:", error.message);
-    return undefined;
+    }
   }
+
+  return undefined;
 }
 
 /**
- * Place a take profit order
+ * Place a take profit order with retry
  */
 async function placeTakeProfit(
   symbol: string,
   amount: number,
   profitPrice: number,
-  side: "buy" | "sell"
+  side: "buy" | "sell",
+  maxRetries: number = 3
 ): Promise<string | number | undefined> {
+  // Take profit is opposite direction to entry
+  const profitSide = side === "sell" ? "buy" : "sell";
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const order = await binance.createOrder(
+        symbol,
+        "TAKE_PROFIT_MARKET",
+        profitSide,
+        amount,
+        undefined,
+        {
+          stopPrice: profitPrice,
+          reduceOnly: true,
+        }
+      );
+
+      console.log(`✓ Take profit order placed at $${profitPrice}`);
+      return order.id;
+    } catch (error: any) {
+      console.error(`⚠️ Take profit attempt ${attempt}/${maxRetries} failed:`, error.message);
+
+      if (attempt < maxRetries) {
+        const delayMs = attempt * 1000; // Exponential backoff: 1s, 2s, 3s
+        console.log(`⏳ Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+      } else {
+        console.error(`❌ Take profit placement failed after ${maxRetries} attempts`);
+        return undefined;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Emergency close a position
+ */
+async function emergencyClosePosition(
+  symbol: string,
+  amount: number,
+  side: "buy" | "sell"
+): Promise<boolean> {
   try {
-    // Take profit is opposite direction to entry
-    const profitSide = side === "sell" ? "buy" : "sell";
+    console.log(`\n⚠️ EMERGENCY: Closing position for ${symbol}...`);
+
+    // Close is opposite direction to entry
+    const closeSide = side === "sell" ? "buy" : "sell";
 
     const order = await binance.createOrder(
       symbol,
-      "TAKE_PROFIT_MARKET",
-      profitSide,
+      "market",
+      closeSide,
       amount,
       undefined,
       {
-        stopPrice: profitPrice,
         reduceOnly: true,
       }
     );
 
-    console.log(`✓ Take profit order placed at $${profitPrice}`);
-    return order.id;
+    console.log(`✅ Emergency close successful! Order ID: ${order.id}`);
+    return true;
   } catch (error: any) {
-    console.error("Error placing take profit:", error.message);
-    return undefined;
+    console.error(`❌ Emergency close failed:`, error.message);
+    return false;
   }
 }
 
@@ -314,26 +380,64 @@ export async function sell(options: SellOptions): Promise<SellResult> {
     // Place stop loss and take profit orders if specified (only for new positions)
     let stopLossOrderId: string | number | undefined;
     let takeProfitOrderId: string | number | undefined;
+    let protectionFailed = false;
 
-    if (!options.closePosition) {
+    if (!options.closePosition && (options.stopLoss || options.takeProfit)) {
+      console.log(`\n🛡️ Setting protection orders...`);
+
       if (options.stopLoss) {
-        console.log(`\nSetting stop loss at $${options.stopLoss}...`);
+        console.log(`Setting stop loss at $${options.stopLoss}...`);
         stopLossOrderId = await placeStopLoss(
           symbol,
           orderAmount,
           options.stopLoss,
-          "sell"
+          "sell",
+          3  // Max 3 retries
         );
+
+        if (!stopLossOrderId) {
+          protectionFailed = true;
+          console.error(`❌ CRITICAL: Stop loss protection failed for ${symbol}`);
+        }
       }
 
-      if (options.takeProfit) {
-        console.log(`\nSetting take profit at $${options.takeProfit}...`);
+      if (options.takeProfit && !protectionFailed) {
+        console.log(`Setting take profit at $${options.takeProfit}...`);
         takeProfitOrderId = await placeTakeProfit(
           symbol,
           orderAmount,
           options.takeProfit,
+          "sell",
+          3  // Max 3 retries
+        );
+
+        if (!takeProfitOrderId) {
+          console.warn(`⚠️ Warning: Take profit placement failed (not critical)`);
+          // Take profit failure is not critical, we still have stop loss
+        }
+      }
+
+      // If stop loss failed, immediately close the position
+      if (protectionFailed) {
+        console.error(`\n❌ CRITICAL: Protection orders failed. Initiating emergency close...`);
+
+        const closeSuccess = await emergencyClosePosition(
+          symbol,
+          orderAmount,
           "sell"
         );
+
+        if (closeSuccess) {
+          throw new Error(
+            `Position opened but protection orders failed. Position was closed immediately for safety. ` +
+            `Please check market conditions and try again.`
+          );
+        } else {
+          throw new Error(
+            `CRITICAL: Position opened at ${symbol} without protection and emergency close failed! ` +
+            `Order ID: ${order.id}. MANUAL INTERVENTION REQUIRED!`
+          );
+        }
       }
     }
 
