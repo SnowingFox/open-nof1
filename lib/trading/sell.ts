@@ -1,4 +1,4 @@
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface SellOptions {
   symbol: string; // 交易对，如 'BTC/USDT' 或 'BTC'

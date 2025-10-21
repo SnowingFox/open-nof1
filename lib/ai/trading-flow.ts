@@ -3,7 +3,7 @@ import { tradingPrompt } from "./prompt";
 import {
   formatMarketState,
   getCurrentMarketState,
-} from "../trading/current-market-state";
+} from "../trading/market-data";
 import { z } from "zod";
 import fs from "fs/promises";
 import { deepseekR1 } from "./model";

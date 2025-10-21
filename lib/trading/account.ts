@@ -1,4 +1,4 @@
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface ExitPlan {
   profit_target: number;

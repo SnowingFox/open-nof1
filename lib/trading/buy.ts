@@ -1,4 +1,4 @@
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface BuyOptions {
   symbol: string; // 交易对，如 'BTC/USDT' 或 'BTC'
@@ -250,7 +250,7 @@ export async function buy(options: BuyOptions): Promise<BuyResult> {
         orderAmount,
         options.price,
         params
-      );
+      ) as any;
     } else {
       console.log(`\nPlacing MARKET BUY order...`);
       order = await binance.createOrder(
@@ -260,7 +260,7 @@ export async function buy(options: BuyOptions): Promise<BuyResult> {
         orderAmount,
         undefined,
         params
-      );
+      ) as any;
     }
 
     console.log(`✓ Order placed successfully! Order ID: ${order.id}`);
@@ -295,18 +295,18 @@ export async function buy(options: BuyOptions): Promise<BuyResult> {
 
     return {
       success: true,
-      orderId: order.id,
+      orderId: order.id as string | number,
       symbol: symbol,
       side: "buy",
       type: orderType,
       amount: orderAmount,
-      price: order.price || order.average,
-      cost: order.cost,
+      price: (order.price as number) || (order.average as number),
+      cost: order.cost as number,
       leverage: leverage,
       stopLossOrderId,
       takeProfitOrderId,
-      timestamp: order.timestamp || startTime,
-      info: order.info,
+      timestamp: (order.timestamp as number) || startTime,
+      info: order.info as Record<string, unknown>,
     };
   } catch (error: any) {
     console.error(`\n❌ Error buying ${options.symbol}:`, error.message);
