@@ -1,5 +1,5 @@
 import { EMA, MACD, RSI, ATR } from "technicalindicators";
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface MarketState {
   // Current indicators
