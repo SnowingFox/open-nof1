@@ -100,6 +100,29 @@ This open-source implementation currently focuses on running the **DeepSeek** tr
    bun dev
    ```
 
+Optional: Run with Docker
+
+If you prefer to run the application with Docker and Docker Compose, you can use the included `docker-compose.yml` to start the app, PostgreSQL, and the cron service. Make sure you have a `.env` file with the required variables (see step 3).
+
+Example (recommended):
+
+```bash
+# Build and start services in the background
+docker compose up --build -d
+
+# Initialize the database (run once or whenever schema changes)
+docker compose exec app bunx prisma db push
+
+# Follow app logs
+docker compose logs -f app
+```
+
+To start only the cron worker (if you want cron jobs running separately):
+
+```bash
+docker compose up -d cron
+```
+
 6. **Set up cron jobs** (for automated trading)
 
    You'll need to set up external cron jobs or use a service like [Vercel Cron](https://vercel.com/docs/cron-jobs) to call these endpoints:
