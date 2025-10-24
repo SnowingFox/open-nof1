@@ -1,5 +1,5 @@
 import { Position } from "ccxt";
-import { binance } from "./biance";
+import { binance } from "./binance";
 
 export interface AccountInformationAndPerformance {
   currentPositionsValue: number;
