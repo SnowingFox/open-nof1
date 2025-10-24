@@ -4,9 +4,9 @@
 # Format: minute hour day month weekday command
 
 # Metrics every ~20 seconds (three executions per minute)
-* * * * * curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
-* * * * * sleep 20 && curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
-* * * * * sleep 40 && curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
+* * * * * sh -c 'TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
+* * * * * sh -c 'sleep 20 && TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
+* * * * * sh -c 'sleep 40 && TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
 
 # Trading every 3 minutes
-*/3 * * * * curl -X POST "$APP_URL/api/cron/3-minutes-run-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
+*/3 * * * * sh -c 'TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/3-minutes-run-interval?token=$TOKEN" -s -o /dev/null'
