@@ -1,0 +1,12 @@
+# Crontab to run automated jobs
+# Note: standard crontab has minute granularity. The following entries use 'sleep' to approximate three executions per minute (every ~20 seconds).
+#
+# Format: minute hour day month weekday command
+
+# Metrics every ~20 seconds (three executions per minute)
+* * * * * curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
+* * * * * sleep 20 && curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
+* * * * * sleep 40 && curl -X POST "$APP_URL/api/cron/20-seconds-metrics-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null
+
+# Trading every 3 minutes
+*/3 * * * * curl -X POST "$APP_URL/api/cron/3-minutes-run-interval" -H "Authorization: Bearer $CRON_SECRET_KEY" -s -o /dev/null

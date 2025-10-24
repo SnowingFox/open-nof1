@@ -1,0 +1,18 @@
+# Dockerfile for cron jobs
+FROM alpine:3.19
+
+# Install curl, ca-certificates and supercronic
+RUN apk add --no-cache curl ca-certificates tzdata && \
+    curl -fsSLO https://github.com/aptible/supercronic/releases/download/v0.2.29/supercronic-linux-amd64 && \
+    chmod +x supercronic-linux-amd64 && \
+    mv supercronic-linux-amd64 /usr/local/bin/supercronic
+
+# Copy the crontab file
+COPY crontab /etc/crontabs/crontab
+
+# Environment variables for the app URL and cron secret
+ENV APP_URL=http://app:3000
+ENV CRON_SECRET_KEY=""
+
+# Run supercronic
+CMD ["supercronic", "/etc/crontabs/crontab"]
