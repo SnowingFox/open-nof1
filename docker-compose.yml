@@ -2,12 +2,12 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:16-alpine
-    container_name: ares-trader-db
+    container_name: nof1-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ares_trader
+      POSTGRES_DB: nof1
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ares-trader-app
+    container_name: nof1-app
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -32,7 +32,7 @@ services:
       NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL:-http://localhost:3000}
 
       # Database
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/ares_trader
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/nof1
 
       # AI Models
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
@@ -67,7 +67,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cron
-    container_name: ares-trader-cron
+    container_name: nof1-cron
     restart: unless-stopped
     environment:
       APP_URL: http://app:3000
