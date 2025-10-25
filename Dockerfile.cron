@@ -1,0 +1,18 @@
+# Dockerfile for cron jobs
+FROM alpine:3.19
+
+# Install curl, ca-certificates, tzdata, nodejs and supercronic
+RUN apk add --no-cache curl ca-certificates tzdata nodejs && \
+    curl -fsSLO https://github.com/aptible/supercronic/releases/download/v0.2.29/supercronic-linux-amd64 && \
+    chmod +x supercronic-linux-amd64 && \
+    mv supercronic-linux-amd64 /usr/local/bin/supercronic
+
+# Add JWT generator script
+COPY scripts/generate-jwt.js /usr/local/bin/generate-jwt
+RUN chmod +x /usr/local/bin/generate-jwt
+
+# Copy the crontab file
+COPY crontab /etc/crontabs/crontab
+
+# Run supercronic
+CMD ["supercronic", "/etc/crontabs/crontab"]

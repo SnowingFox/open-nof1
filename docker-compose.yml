@@ -1,0 +1,81 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: nof1-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: nof1
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nof1-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Application
+      NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL:-http://localhost:3000}
+
+      # Database
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/nof1
+
+      # AI Models
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+
+      # Market Research
+      EXA_API_KEY: ${EXA_API_KEY}
+
+      # Trading (Binance)
+      BINANCE_API_KEY: ${BINANCE_API_KEY}
+      BINANCE_API_SECRET: ${BINANCE_API_SECRET}
+
+      # Trading Configuration
+      START_MONEY: ${START_MONEY:-10000}
+
+      # Cron Job Authentication
+      CRON_SECRET_KEY: ${CRON_SECRET_KEY}
+
+      # Node Environment
+      NODE_ENV: development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "bunx prisma db push && bun dev"
+
+  # Cron Jobs
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    container_name: nof1-cron
+    restart: unless-stopped
+    environment:
+      APP_URL: http://app:3000
+      CRON_SECRET_KEY: ${CRON_SECRET_KEY}
+      TZ: ${TZ:-UTC}
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+    driver: local

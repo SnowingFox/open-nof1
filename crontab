@@ -1,0 +1,12 @@
+# Crontab to run automated jobs
+# Note: standard crontab has minute granularity. The following entries use 'sleep' to approximate three executions per minute (every ~20 seconds).
+#
+# Format: minute hour day month weekday command
+
+# Metrics every ~20 seconds (three executions per minute)
+* * * * * sh -c 'TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
+* * * * * sh -c 'sleep 20 && TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
+* * * * * sh -c 'sleep 40 && TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/20-seconds-metrics-interval?token=$TOKEN" -s -o /dev/null'
+
+# Trading every 3 minutes
+*/3 * * * * sh -c 'TOKEN=$(generate-jwt) && curl -X GET "$APP_URL/api/cron/3-minutes-run-interval?token=$TOKEN" -s -o /dev/null'
