@@ -5,8 +5,11 @@ export const hyperliquid = new ccxt.hyperliquid({
   walletAddress: process.env.HYPERLIQUID_WALLET_ADDRESS,
   enableRateLimit: true,
   options: {
-    sandboxMode: true,
     // Hyperliquid-specific options
     defaultType: "swap", // For perpetual contracts
   }
 });
+
+// IMPORTANT: Use setSandboxMode() method to properly configure testnet
+// This ensures both the API endpoint AND signature scheme match the network
+hyperliquid.setSandboxMode(true);
