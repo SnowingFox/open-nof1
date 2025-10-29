@@ -98,7 +98,7 @@ export default function Home() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">
-              Open Nof1.ai
+              HyperSeek.ai
               <span className="text-muted-foreground text-sm ml-2">
                 inspired by Alpha Arena
               </span>

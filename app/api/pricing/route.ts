@@ -6,11 +6,11 @@ export const GET = async () => {
     // 并行获取所有加密货币价格
     const [btcPricing, ethPricing, solPricing, dogePricing, bnbPricing] =
       await Promise.all([
-        getCurrentMarketState("BTC/USDT"),
-        getCurrentMarketState("ETH/USDT"),
-        getCurrentMarketState("SOL/USDT"),
-        getCurrentMarketState("DOGE/USDT"),
-        getCurrentMarketState("BNB/USDT"),
+        getCurrentMarketState("BTC"),
+        getCurrentMarketState("ETH"),
+        getCurrentMarketState("SOL"),
+        getCurrentMarketState("DOGE"),
+        getCurrentMarketState("BNB"),
       ]);
 
     return NextResponse.json({

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import cron from "node-cron";
 import jwt from "jsonwebtoken";
 
@@ -47,4 +48,7 @@ cron.schedule("*/3 * * * *", async () => {
   await runChatInterval();
 });
 
-await runChatInterval();
+// Run the chat interval immediately on startup
+(async () => {
+  await runChatInterval();
+})();

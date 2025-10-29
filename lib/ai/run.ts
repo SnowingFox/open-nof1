@@ -11,7 +11,8 @@ import { Opeartion, Symbol } from "@prisma/client";
  * you can interval trading using cron job
  */
 export async function run(initialCapital: number) {
-  const currentMarketState = await getCurrentMarketState("BTC/USDT");
+  // Use Hyperliquid perpetual format: SYMBOL/USDC:USDC
+  const currentMarketState = await getCurrentMarketState("BTC/USDC:USDC");
   const accountInformationAndPerformance =
     await getAccountInformationAndPerformance(initialCapital);
   // Count previous Chat entries to provide an invocation counter in the prompt
@@ -36,7 +37,13 @@ export async function run(initialCapital: number) {
         .object({
           pricing: z.number().describe("The pricing of you want to buy in."),
           amount: z.number(),
-          leverage: z.number().min(1).max(20),
+          leverage: z
+            .number()
+            .min(1)
+            .max(50)
+            .describe(
+              "Leverage for position (1-50x). Hyperliquid max is 50x. Recommend 2-10x for safety."
+            ),
         })
         .optional()
         .describe("If opeartion is buy, generate object"),

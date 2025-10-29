@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/20-seconds-metrics-interval",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/3-minutes-run-interval",
+      "schedule": "*/3 * * * *"
+    }
+  ]
+}

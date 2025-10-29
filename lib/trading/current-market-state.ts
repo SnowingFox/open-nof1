@@ -1,5 +1,5 @@
 import { EMA, MACD, RSI, ATR } from "technicalindicators";
-import { binance } from "./binance";
+import { hyperliquid } from "./hyperliquid";
 
 export interface MarketState {
   // Current indicators
@@ -14,8 +14,16 @@ export interface MarketState {
     average: number;
   };
 
-  // Funding Rate
+  // Funding Rate (critical for perpetuals)
   funding_rate: number;
+
+  // Orderbook depth (for liquidity analysis)
+  orderbook: {
+    bid_liquidity_10: number; // Total $ liquidity in top 10 bids
+    ask_liquidity_10: number; // Total $ liquidity in top 10 asks
+    spread_bps: number; // Spread in basis points
+    imbalance_ratio: number; // Bid/Ask ratio (>1 = more buy pressure)
+  };
 
   // Intraday series (by minute)
   intraday: {
@@ -97,11 +105,14 @@ export async function getCurrentMarketState(
   symbol: string
 ): Promise<MarketState> {
   try {
-    // Normalize symbol format for Binance
-    const normalizedSymbol = symbol.includes("/") ? symbol : `${symbol}/USDT`;
+    // Normalize symbol format for hyperliquid perpetual contracts
+    // Hyperliquid expects format like "BTC/USDC:USDC" for perpetuals
+    const normalizedSymbol = symbol.includes("/")
+      ? symbol
+      : `${symbol}/USDC:USDC`;
 
     // Fetch 1-minute OHLCV data (last 100 candles for intraday analysis)
-    const ohlcv1m = await binance.fetchOHLCV(
+    const ohlcv1m = await hyperliquid.fetchOHLCV(
       normalizedSymbol,
       "1m",
       undefined,
@@ -109,7 +120,7 @@ export async function getCurrentMarketState(
     );
 
     // Fetch 4-hour OHLCV data (last 100 candles for longer-term context)
-    const ohlcv4h = await binance.fetchOHLCV(
+    const ohlcv4h = await hyperliquid.fetchOHLCV(
       normalizedSymbol,
       "4h",
       undefined,
@@ -161,9 +172,10 @@ export async function getCurrentMarketState(
     let fundingRate = 0;
 
     try {
-      // Try to fetch open interest
-      const perpSymbol = normalizedSymbol.replace("/", "");
-      const openInterest = await binance.fetchOpenInterest(perpSymbol);
+      // Try to fetch open interest and funding rate using the normalized symbol
+      const openInterest = await hyperliquid.fetchOpenInterest(
+        normalizedSymbol
+      );
 
       if (openInterest && typeof openInterest.openInterestAmount === "number") {
         openInterestData.latest = openInterest.openInterestAmount;
@@ -171,7 +183,7 @@ export async function getCurrentMarketState(
       }
 
       // Try to fetch funding rate
-      const fundingRates = await binance.fetchFundingRate(normalizedSymbol);
+      const fundingRates = await hyperliquid.fetchFundingRate(normalizedSymbol);
       if (fundingRates && typeof fundingRates.fundingRate === "number") {
         fundingRate = fundingRates.fundingRate;
       }
@@ -185,6 +197,51 @@ export async function getCurrentMarketState(
       volumes4h.reduce((sum, vol) => sum + vol, 0) / volumes4h.length;
     const currentVolume4h = volumes4h[volumes4h.length - 1];
 
+    // Fetch orderbook depth for liquidity analysis
+    const orderbookData = {
+      bid_liquidity_10: 0,
+      ask_liquidity_10: 0,
+      spread_bps: 0,
+      imbalance_ratio: 1,
+    };
+
+    try {
+      const orderbook = await hyperliquid.fetchOrderBook(normalizedSymbol, 10);
+
+      // Calculate liquidity (sum of price * size for top 10 levels)
+      const bidLiquidity = orderbook.bids
+        .slice(0, 10)
+        .reduce((sum, level) => {
+          const price = level[0] ?? 0;
+          const size = level[1] ?? 0;
+          return sum + price * size;
+        }, 0);
+      const askLiquidity = orderbook.asks
+        .slice(0, 10)
+        .reduce((sum, level) => {
+          const price = level[0] ?? 0;
+          const size = level[1] ?? 0;
+          return sum + price * size;
+        }, 0);
+
+      // Calculate spread in basis points
+      const bestBid = orderbook.bids[0]?.[0] || 0;
+      const bestAsk = orderbook.asks[0]?.[0] || 0;
+      const spreadBps =
+        bestBid > 0 ? ((bestAsk - bestBid) / bestBid) * 10000 : 0;
+
+      // Calculate imbalance ratio (bid/ask)
+      const imbalanceRatio = askLiquidity > 0 ? bidLiquidity / askLiquidity : 1;
+
+      orderbookData.bid_liquidity_10 = bidLiquidity;
+      orderbookData.ask_liquidity_10 = askLiquidity;
+      orderbookData.spread_bps = spreadBps;
+      orderbookData.imbalance_ratio = imbalanceRatio;
+    } catch (error) {
+      console.warn("Could not fetch orderbook:", error);
+      // Continue with default values
+    }
+
     return {
       current_price,
       current_ema20,
@@ -192,6 +249,7 @@ export async function getCurrentMarketState(
       current_rsi,
       open_interest: openInterestData,
       funding_rate: fundingRate,
+      orderbook: orderbookData,
       intraday: {
         mid_prices: last10MidPrices,
         ema_20: last10EMA20,
@@ -221,59 +279,82 @@ export async function getCurrentMarketState(
  */
 export function formatMarketState(state: MarketState): string {
   return `
-Current Market State:
-current_price = ${
-    state.current_price
-  }, current_ema20 = ${state.current_ema20.toFixed(
-    3
-  )}, current_macd = ${state.current_macd.toFixed(
-    3
-  )}, current_rsi (7 period) = ${state.current_rsi.toFixed(3)}
+    Current Market State:
+    current_price = ${
+        state.current_price
+      }, current_ema20 = ${state.current_ema20.toFixed(
+        3
+      )}, current_macd = ${state.current_macd.toFixed(
+        3
+      )}, current_rsi (7 period) = ${state.current_rsi.toFixed(3)}
 
-In addition, here is the latest BTC open interest and funding rate for perps:
+    PERPETUAL FUTURES DATA (Critical for trading decisions):
 
-Open Interest: Latest: ${state.open_interest.latest.toFixed(
-    2
-  )} Average: ${state.open_interest.average.toFixed(2)}
+    Open Interest: Latest: ${state.open_interest.latest.toFixed(
+        2
+      )} BTC, Average: ${state.open_interest.average.toFixed(2)} BTC
+    ${
+      state.open_interest.latest > state.open_interest.average
+        ? "⚠️ OI increasing - strong momentum"
+        : "⚠️ OI decreasing - weakening momentum"
+    }
 
-Funding Rate: ${state.funding_rate.toExponential(2)}
+    Funding Rate: ${state.funding_rate.toExponential(2)} (${
+        state.funding_rate > 0
+          ? "Longs pay shorts - bearish signal"
+          : state.funding_rate < 0
+          ? "Shorts pay longs - bullish signal"
+          : "Neutral"
+      })
 
-Intraday series (by minute, oldest → latest):
+    ORDERBOOK LIQUIDITY (for entry/exit timing):
+    Bid Liquidity (top 10): $${state.orderbook.bid_liquidity_10.toFixed(0)}
+    Ask Liquidity (top 10): $${state.orderbook.ask_liquidity_10.toFixed(0)}
+    Spread: ${state.orderbook.spread_bps.toFixed(2)} bps
+    Imbalance Ratio: ${state.orderbook.imbalance_ratio.toFixed(3)} ${
+        state.orderbook.imbalance_ratio > 1.1
+          ? "(Buy pressure)"
+          : state.orderbook.imbalance_ratio < 0.9
+          ? "(Sell pressure)"
+          : "(Balanced)"
+      }
 
-Mid prices: [${state.intraday.mid_prices.map((v) => v.toFixed(1)).join(", ")}]
+    Intraday series (by minute, oldest → latest):
 
-EMA indicators (20‑period): [${state.intraday.ema_20
-    .map((v) => v.toFixed(3))
-    .join(", ")}]
+    Mid prices: [${state.intraday.mid_prices.map((v) => v.toFixed(1)).join(", ")}]
 
-MACD indicators: [${state.intraday.macd.map((v) => v.toFixed(3)).join(", ")}]
+    EMA indicators (20‑period): [${state.intraday.ema_20
+        .map((v) => v.toFixed(3))
+        .join(", ")}]
 
-RSI indicators (7‑Period): [${state.intraday.rsi_7
-    .map((v) => v.toFixed(3))
-    .join(", ")}]
+    MACD indicators: [${state.intraday.macd.map((v) => v.toFixed(3)).join(", ")}]
 
-RSI indicators (14‑Period): [${state.intraday.rsi_14
-    .map((v) => v.toFixed(3))
-    .join(", ")}]
+    RSI indicators (7‑Period): [${state.intraday.rsi_7
+        .map((v) => v.toFixed(3))
+        .join(", ")}]
 
-Longer‑term context (4‑hour timeframe):
+    RSI indicators (14‑Period): [${state.intraday.rsi_14
+        .map((v) => v.toFixed(3))
+        .join(", ")}]
 
-20‑Period EMA: ${state.longer_term.ema_20.toFixed(
-    3
-  )} vs. 50‑Period EMA: ${state.longer_term.ema_50.toFixed(3)}
+    Longer‑term context (4‑hour timeframe):
 
-3‑Period ATR: ${state.longer_term.atr_3.toFixed(
-    3
-  )} vs. 14‑Period ATR: ${state.longer_term.atr_14.toFixed(3)}
+    20‑Period EMA: ${state.longer_term.ema_20.toFixed(
+        3
+      )} vs. 50‑Period EMA: ${state.longer_term.ema_50.toFixed(3)}
 
-Current Volume: ${state.longer_term.current_volume.toFixed(
-    3
-  )} vs. Average Volume: ${state.longer_term.average_volume.toFixed(3)}
+    3‑Period ATR: ${state.longer_term.atr_3.toFixed(
+        3
+      )} vs. 14‑Period ATR: ${state.longer_term.atr_14.toFixed(3)}
 
-MACD indicators: [${state.longer_term.macd.map((v) => v.toFixed(3)).join(", ")}]
+    Current Volume: ${state.longer_term.current_volume.toFixed(
+        3
+      )} vs. Average Volume: ${state.longer_term.average_volume.toFixed(3)}
 
-RSI indicators (14‑Period): [${state.longer_term.rsi_14
-    .map((v) => v.toFixed(3))
-    .join(", ")}]
-`.trim();
-}
+    MACD indicators: [${state.longer_term.macd.map((v) => v.toFixed(3)).join(", ")}]
+
+    RSI indicators (14‑Period): [${state.longer_term.rsi_14
+        .map((v) => v.toFixed(3))
+        .join(", ")}]
+    `.trim();
+    }

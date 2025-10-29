@@ -1,5 +1,5 @@
 import { Position } from "ccxt";
-import { binance } from "./binance";
+import { hyperliquid } from "./hyperliquid";
 
 export interface AccountInformationAndPerformance {
   currentPositionsValue: number;
@@ -14,16 +14,20 @@ export interface AccountInformationAndPerformance {
 export async function getAccountInformationAndPerformance(
   initialCapital: number
 ): Promise<AccountInformationAndPerformance> {
-  const positions = await binance.fetchPositions(["BTC/USDT"]);
+  // Hyperliquid uses USDC for perpetuals, not USDT
+  const positions = await hyperliquid.fetchPositions(["BTC/USDC:USDC"]);
   const currentPositionsValue = positions.reduce((acc, position) => {
     return acc + (position.initialMargin || 0) + (position.unrealizedPnl || 0);
   }, 0);
   const contractValue = positions.reduce((acc, position) => {
     return acc + (position.contracts || 0);
   }, 0);
-  const currentCashValue = await binance.fetchBalance({ type: "future" });
-  const totalCashValue = currentCashValue.USDT.total || 0;
-  const availableCash = currentCashValue.USDT.free || 0;
+  // Fetch balance for Hyperliquid - it uses USDC not USDT
+  const currentCashValue = await hyperliquid.fetchBalance({
+    user: process.env.HYPERLIQUID_WALLET_ADDRESS,
+  });
+  const totalCashValue = currentCashValue.USDC?.total || 0;
+  const availableCash = currentCashValue.USDC?.free || 0;
   const currentTotalReturn = (totalCashValue - initialCapital) / initialCapital;
   const sharpeRatio =
     currentTotalReturn /
