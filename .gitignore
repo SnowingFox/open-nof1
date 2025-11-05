@@ -39,3 +39,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+app/api/cron/20-seconds-metrics-interval/route.ts.bak

@@ -9,6 +9,24 @@ import { InputJsonValue, JsonValue } from "@prisma/client/runtime/library";
 const MAX_METRICS_COUNT = 100;
 
 /**
+ * Wrap the balance object so that missing maps (total/free/used) behave
+ * like objects that always return 0. This keeps downstream code such as
+ * `balance.total.USDT` from throwing when ccxt returns partial balances.
+ */
+function withSafeBalance<T extends { balance?: any }>(obj: T): T {
+  const zero = new Proxy<Record<string, number>>({}, { get: () => 0 }); // any key -> 0
+  const b = (obj as any)?.balance ?? {};
+  const safe = {
+    ...b,
+    total: b?.total ?? zero,
+    free:  b?.free  ?? zero,
+    used:  b?.used  ?? zero,
+  };
+  return { ...(obj as any), balance: safe };
+}
+
+
+/**
  * uniformly sample the array, keeping the first and last elements unchanged
  * @param data - the original data array
  * @param maxSize - the maximum number of metrics to keep
