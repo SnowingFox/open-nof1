@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,33 +8,27 @@ datasource db {
 }
 
 model Metrics {
-  id String @id @default(uuid())
-
-  name  String
-  model ModelType
-
-  metrics Json[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(uuid())
+  name      String
+  model     ModelType
+  metrics   Json[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Chat {
-  id String @id @default(uuid())
-
+  id         String    @id @default(uuid())
   model      ModelType @default(Deepseek)
   chat       String    @default("<no chat>")
   reasoning  String
   userPrompt String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   tradings   Trading[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Trading {
-  id String @id @default(uuid())
-
+  id         String    @id @default(uuid())
   symbol     Symbol
   opeartion  Opeartion
   leverage   Int?
@@ -45,12 +36,10 @@ model Trading {
   pricing    Int?
   stopLoss   Int?
   takeProfit Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  Chat   Chat?   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  chatId String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  chatId     String?
+  Chat       Chat?     @relation(fields: [chatId], references: [id], onDelete: Cascade)
 }
 
 enum Opeartion {
