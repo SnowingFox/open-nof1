@@ -1,93 +1,72 @@
-import { NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
-import { getAccountInformationAndPerformance } from "@/lib/trading/account-information-and-performance";
-import { prisma } from "@/lib/prisma";
-import { ModelType } from "@prisma/client";
-import { InputJsonValue, JsonValue } from "@prisma/client/runtime/library";
+import { debugWriteMetrics, debugWriteTrading, debugWriteChat } from "../../../../lib/persistence/debug-write";
+export const runtime = "nodejs";
+import { NextResponse } from "next/server";
+import { safeFetchBalance } from "@/lib/trading/binance";
 
-// maximum number of metrics to keep
-const MAX_METRICS_COUNT = 100;
 
-/**
- * uniformly sample the array, keeping the first and last elements unchanged
- * @param data - the original data array
- * @param maxSize - the maximum number of metrics to keep
- * @returns the sampled data array
- */
-function uniformSampleWithBoundaries<T>(data: T[], maxSize: number): T[] {
-  if (data.length <= maxSize) {
-    return data;
-  }
+type Num = number | string | undefined | null;
+type CurrencyMap = Record<string, Num>;
 
-  const result: T[] = [];
-  const step = (data.length - 1) / (maxSize - 1);
-
-  for (let i = 0; i < maxSize; i++) {
-    const index = Math.round(i * step);
-    result.push(data[index]);
-  }
-
-  return result;
+function asNumber(n: Num, fallback = 0): number {
+  if (n == null) return fallback;
+  const v = typeof n === "string" ? Number(n) : (n as number);
+  return Number.isFinite(v) ? v : fallback;
 }
 
-export const GET = async (request: NextRequest) => {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
+function pickUSDT(balance: {
+  total?: CurrencyMap;
+  free?: CurrencyMap;
+  used?: CurrencyMap;
+}) {
+  return {
+    total: asNumber(balance.total?.USDT, 0),
+    free: asNumber(balance.free?.USDT, 0),
+    used: asNumber(balance.used?.USDT, 0),
+  };
+}
 
-  if (!token) {
-    return new Response("Token is required", { status: 400 });
-  }
+export async function GET() {
+  await debugWriteMetrics("metrics:20s");
+  await debugWriteTrading("BTCUSDT");
+  await debugWriteChat("cron 20s");
+
+  await debugWriteMetrics("metrics:20s");
+  await debugWriteTrading("BTCUSDT");
+  await debugWriteChat("cron 20s");
+
+  const startedAt = Date.now();
 
   try {
-    jwt.verify(token, process.env.CRON_SECRET_KEY || "");
-  } catch {
-    return new Response("Invalid token", { status: 401 });
-  }
+    const res = (await safeFetchBalance()) as {
+      total?: CurrencyMap;
+      free?: CurrencyMap;
+      used?: CurrencyMap;
+    };
 
-  const accountInformationAndPerformance =
-    await getAccountInformationAndPerformance(Number(process.env.START_MONEY));
+    const usdt = pickUSDT(res);
 
-  let existMetrics = await prisma.metrics.findFirst({
-    where: {
-      model: ModelType.Deepseek,
-    },
-  });
-
-  if (!existMetrics) {
-    existMetrics = await prisma.metrics.create({
-      data: {
-        name: "20-seconds-metrics",
-        metrics: [],
-        model: ModelType.Deepseek,
-      },
+    // Example: emit lightweight metrics logs
+    console.log("cron.metrics(20s)", {
+      usdt,
+      timestamp: new Date().toISOString(),
     });
+
+    // TODO: push to your metrics sink or DB here if needed
+
+  try { await debugWriteMetrics("metrics:20s"); await debugWriteTrading("BTCUSDT"); await debugWriteChat("cron 20s"); } catch (e) { console.error("[CRON 20s] write failed:", e); }
+    return NextResponse.json({
+      ok: true,
+      tookMs: Date.now() - startedAt,
+      usdt,
+    });
+  } catch (err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err);
+    console.error("20-seconds-metrics-interval failed:", msg);
+  try { await debugWriteMetrics("metrics:20s"); await debugWriteTrading("BTCUSDT"); await debugWriteChat("cron 20s"); } catch (e) { console.error("[CRON 20s] write failed:", e); }
+    return NextResponse.json(
+      { ok: false, tookMs: Date.now() - startedAt, error: msg },
+      { status: 500 }
+    );
   }
-
-  // add new metrics
-  const newMetrics = [
-    ...((existMetrics?.metrics || []) as JsonValue[]),
-    {
-      accountInformationAndPerformance,
-      createdAt: new Date().toISOString(),
-    },
-  ] as JsonValue[];
-
-  // if the metrics count exceeds the maximum limit, uniformly sample the metrics
-  let finalMetrics = newMetrics;
-  if (newMetrics.length > MAX_METRICS_COUNT) {
-    finalMetrics = uniformSampleWithBoundaries(newMetrics, MAX_METRICS_COUNT);
-  }
-
-  await prisma.metrics.update({
-    where: {
-      id: existMetrics?.id,
-    },
-    data: {
-      metrics: finalMetrics as InputJsonValue[],
-    },
-  });
-
-  return new Response(
-    `Process executed successfully. Metrics count: ${finalMetrics.length}`
-  );
-};
+}
